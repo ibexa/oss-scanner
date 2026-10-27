@@ -7,7 +7,9 @@
 #                procedure for development branches (the same one Ibexa's CI uses): `composer create-project
 #                ibexa/website-skeleton`, `composer require ibexa/oss`, the Flex recipes, `post-update-cmd`, then
 #                `bin/console ibexa:install`. ibexa/core is installed from /src as a symlinked path repository, so the
-#                site runs the checkout and a patch to /src takes effect on the site straight away.
+#                site runs the checkout. A PHP code patch to /src takes effect on the site straight away; the prod
+#                environment caches templates, configuration and service definitions, so any other patch needs
+#                `ibexa-console cache:clear`.
 #
 # Nothing here names a version. The version to install (for example 6.0.x-dev) is read from the checkout's branch
 # alias, so the build follows the repository's default branch to the next version on its own. Only the PHP base
@@ -44,8 +46,8 @@ RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && node --version && yarn --version
 
 # Production-like PHP, per Ibexa's security checklist: errors are logged, not shown, and stack traces leave out
-# arguments; OPcache picks up edited files immediately so a patch can be
-# checked straight away. The console and the test suites get more memory than a web request.
+# arguments; OPcache picks up edited files immediately so a patch can be checked straight away. The memory limit
+# applies to web requests too; it is sized for the console and the test suites.
 RUN { echo 'memory_limit=512M'; \
       echo 'error_reporting=E_ALL'; \
       echo 'display_errors=Off'; \
@@ -111,7 +113,7 @@ RUN printf '%s\n' '#!/bin/sh' 'set -e' \
       > /usr/local/bin/ibexa-start \
     && printf '%s\n' '#!/bin/sh' 'apachectl stop 2>/dev/null; mariadb-admin shutdown 2>/dev/null; true' \
       > /usr/local/bin/ibexa-stop \
-    && printf '%s\n' '#!/bin/sh' 'cd /opt/ibexa && exec su -s /bin/sh www-data -c "php bin/console $*"' \
+    && printf '%s\n' '#!/bin/sh' 'cd /opt/ibexa && exec runuser -u www-data -- php bin/console "$@"' \
       > /usr/local/bin/ibexa-console \
     && chmod +x /usr/local/bin/ibexa-start /usr/local/bin/ibexa-stop /usr/local/bin/ibexa-console
 
